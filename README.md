@@ -2,6 +2,16 @@ Ldap dumper is a semi-fast tool to bruteforce unescaped user-input
 concatenations to [LDAP filters](http://www.ietf.org/rfc/rfc1960.txt) over HTTP
 parameters.
 
+# Installation
+
+```
+git clone git@github.com:droope/ldap-brute.git
+cd ldap-brute/
+pip install -r requirements.txt
+```
+
+# Usage
+
 ```
 usage: ldap-dumper.py [-h]
                       [--charset {lower_and_digit,upperlower_and_digits,upperlower_hex,digits}]
