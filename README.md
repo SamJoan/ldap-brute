@@ -1,4 +1,3 @@
-
 Ldap dumper is a semi-fast tool to bruteforce plain text concatenations to
 [LDAP filters](http://www.ietf.org/rfc/rfc1960.txt) over HTTP parameters.
 
