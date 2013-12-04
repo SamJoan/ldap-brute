@@ -1,4 +1,3 @@
-
 aliasedObjectName
 alt-Security-Identities
 anr
@@ -41,7 +40,6 @@ dhcpType
 directReports
 displayName
 display-Name
-displayName 	
 distinguishedName
 dITRedirect
 dmdName
@@ -56,7 +54,6 @@ employeeNumber
 employeeType
 enhancedSearchGuide
 facsimileTelephoneNumber
-facsimileTelephoneNumber 	
 fileExtPriority
 flatName
 fSMORoleOwner
@@ -73,13 +70,11 @@ homeDirectory
 homepage
 homephone
 homePhone
-homePhone 	
 homePostalAddress
 host
 houseIdentifier
 implementedCategories
 info
-info 	
 initials
 internationaliSDNNumber
 internationalISDNNumber
@@ -123,7 +118,6 @@ member
 memberNisNetgroup
 memberUid
 mobile
-mobile 	
 mS-DS-CreatorSID
 mSMQDigests
 mSMQLabel
@@ -145,7 +139,6 @@ nisPublicKey
 nisSecretKey
 o
 objectCategory
-objectclass
 objectClass
 objectGUID
 objectSid
@@ -166,11 +159,9 @@ otherMailbox
 otherPager
 otherTelephone
 ou
-ou organizationalUnitName department
 owner
 packageFlags
 pager
-pager 	
 person
 personalSignature
 personalTitle
@@ -188,7 +179,6 @@ protocolInformation
 proxyAddresses
 ref
 registeredAddress
-reports 
 Reports
 requiredCategories
 residentialPerson
@@ -215,7 +205,6 @@ shadowWarning
 showInAdvancedViewOnly
 sIDHistory
 sn
-sn surname
 st
 street
 streetAddress
@@ -224,16 +213,15 @@ subtreeMinimumQuality
 supportedAlgorithms
 supportedApplicationContext
 surname
-telephoneAssistant 	
+telephoneAssistant
 Telephone-Assistant
 telephonenumber
 telephoneNumber
-telephoneNumber 	
 Telephone-Office2
 teletexTerminalIdentifier
 telexNumber
 textEncodedORaddress
-thumbnailPhoto 	
+thumbnailPhoto
 timeVolChange
 title
 trustPartner
@@ -246,20 +234,17 @@ uniqueMember
 URL
 userAccountControl
 userCertificate
-userCertificate;binary user-cert;binary
 userClass
 userPassword
 userPKCS12
 userPrincipalName
 userSMIMECertificate
-userSMIMECertificate;binary
 uSNChanged
 uSNCreated
 USNIntersite
 volTableIdxGUID
 x121Address
 x500UniqueIdentifier
-x500UniqueIdentifier 
 xmozillaconference
 xmozillanickname
 xmozillauseconferenceserver

@@ -1,5 +1,5 @@
 from httmock import urlmatch, HTTMock, all_requests
-from mock import patch
+from mock import patch, mock_open
 import unittest, requests, string, ldap_brute
 
 TRUE_STRING = "true string"
@@ -26,8 +26,12 @@ def parse_and_main(cli_args):
     args = parser.parse_args(cli_args)
     ldap_brute.main(args, output=False)
 
+def wordlist_custom_set(wordlist):
+        ldap_brute.common.charset_set(ldap_brute.common.DEFAULT_CHARSET,
+                None, wordlist)
+
 def charset_custom_set(custom_charset):
-    ldap_brute.common.charset_set(ldap_brute.common.CHARSET_DEFAULT, custom_charset, None)
+    ldap_brute.common.charset_set(ldap_brute.common.DEFAULT_CHARSET, custom_charset, None)
 
 @all_requests
 def wildcard_admin(url, request):
@@ -81,7 +85,7 @@ class LdapBruteTest(unittest.TestCase):
     def setUp(self):
         #ldap_brute.common.logging_set(2)
         ldap_brute.common.LDAP_GLOBALS = ldap_brute.common.LdapGlobals()
-        ldap_brute.common.charset_set(ldap_brute.common.CHARSET_DEFAULT, None, None)
+        ldap_brute.common.charset_set(ldap_brute.common.DEFAULT_CHARSET, None, None)
 
     def test_wildcard_basic(self):
         with HTTMock(wildcard_admin):
@@ -146,6 +150,19 @@ class LdapBruteTest(unittest.TestCase):
         parse_and_main(cli_args)
 
         self.assertTrue(ldap_brute.brute_nowild.called, "Should have called ldap_brute.brute_nowild")
+
+    @patch("ldap_brute.common.or_wordlist_generator")
+    def test_nowildcard_wordlist(self, mocked_method):
+        return_values = ['cn', 'sn', 'uid', 'password']
+        mocked_method.return_value = iter(return_values)
+
+
+        wordlist_custom_set("this file is too good to be true, commas, spaces, we!rd si#ns.")
+        with HTTMock(attribute_uid):
+            res = ldap_brute.brute_nowild(BASE_URL, TRUE_STRING,
+                    ldap_brute.common.LDAP_GLOBALS.BRUTE)
+
+        self.assertEqual(['uid'], res, "Valid results should only be uid.")
 
 if __name__ == '__main__':
     unittest.main()

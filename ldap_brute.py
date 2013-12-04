@@ -88,7 +88,7 @@ def brute(base_url, true_string):
     return exist
 
 # all parameters are arguments gotten from the command line.
-def brute_nowild(base_url, true_string, attribute_name, word_size, max_path_size=8100, size_is_exact=False):
+def brute_nowild(base_url, true_string, attribute_name, word_size=common.DEFAULT_WORD_SIZE, max_path_size=common.DEFAULT_MAX_PATH, size_is_exact=False):
     bruting_attr = attribute_name == common.LDAP_GLOBALS.BRUTE
     if bruting_attr:
         logging.info("entering non-wildcard mode for url '%s' (bruteforcing attribute names)." % base_url)
@@ -105,7 +105,6 @@ def brute_nowild(base_url, true_string, attribute_name, word_size, max_path_size
         if request_true(url, true_string):
             looper = common.or_loop(or_subfilter)
             for filt in looper:
-
                 if request_true(base_url % filt, true_string):
                     if not bruting_attr:
                         found = filt[len(attribute_name)+2:-1]

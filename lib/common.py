@@ -25,7 +25,9 @@ class LdapGlobals():
     bruteforce_options = BruteforceOptions()
 
 LDAP_GLOBALS = LdapGlobals()
-CHARSET_DEFAULT = "lower_and_digit"
+DEFAULT_CHARSET = "lower_and_digit"
+DEFAULT_WORD_SIZE = 6
+DEFAULT_MAX_PATH = 8100
 
 def charset_get():
     return LDAP_GLOBALS.bruteforce_options.charset_get()
@@ -69,6 +71,24 @@ def progress_indicate():
     if LDAP_GLOBALS.total_progress_calls % 50 == 0:
         logging.info(str(LDAP_GLOBALS.total_progress_calls) + "...")
 
+def or_bruteforce_generator(word_size, charset, size_is_exact):
+    if not size_is_exact:
+        i = 0
+    else:
+        i = word_size - 1
+
+    while i < word_size:
+        i += 1
+        possibilities = itertools.product(charset, repeat=i)
+        for poss in possibilities:
+            yield poss
+
+def or_wordlist_generator(wordlist_file):
+    with open(wordlist_file, 'r') as f:
+        for line in f:
+            line = line.rstrip("\r\n")
+            yield line
+
 def or_generate(space_per_request, attribute_name, word_size, size_is_exact):
     charset = charset_get()
     or_base = "(|%s)"
@@ -81,29 +101,26 @@ def or_generate(space_per_request, attribute_name, word_size, size_is_exact):
     else:
         attr_base = "(%s=%s)"
 
-    if not size_is_exact:
-        i = 0
+    wordlist_file = LDAP_GLOBALS.bruteforce_options.wordlist_file
+    if wordlist_file != None:
+        possibilities = or_wordlist_generator(wordlist_file)
     else:
-        i = word_size - 1
+        possibilities = or_bruteforce_generator(word_size, charset, size_is_exact)
 
     tmp = ""
-    while i < word_size:
-        i += 1
-        possibilities = itertools.product(charset, repeat=i)
-        for poss in possibilities:
+    for poss in possibilities:
+        if bruting_attr:
+            val = attr_base % "".join(poss)
+        else:
+            val = attr_base % (attribute_name, "".join(poss))
 
-            if bruting_attr:
-                val = attr_base % "".join(poss)
-            else:
-                val = attr_base % (attribute_name, "".join(poss))
+        # too large! flush
+        if len(tmp) + len(val) > real_free:
+            or_clause = or_base % tmp
+            tmp = ""
+            yield or_clause
 
-            # too large! flush
-            if len(tmp) + len(val) > real_free :
-                or_clause = or_base % tmp
-                tmp = ""
-                yield or_clause
-
-            tmp += val
+        tmp += val
 
     # flush the rest.
     if tmp != "":
@@ -112,6 +129,7 @@ def or_generate(space_per_request, attribute_name, word_size, size_is_exact):
 
 # Goes through each of the or filters, a string sort of like this:
 # (|(gidNumber=18880)(gidNumber=18881)(gidNumber=18882)(gidNumber=18883)...)
+# and returns each or individually
 def or_loop(or_subfilter):
     # substr the (|...)
     final = or_subfilter[2:-1]
@@ -143,7 +161,7 @@ def parser_get(doc_string=""):
     bruteforce_options.add_argument("--charset", "-c", help="""The set of
     characters the script will attempt to use while bruteforcing.""",
     choices=['lower_and_digit', 'upperlower_and_digits', 'upperlower_hex',
-        'digits', 'lower'], default=CHARSET_DEFAULT)
+        'digits', 'lower'], default=DEFAULT_CHARSET)
     bruteforce_options.add_argument("--charset-custom", "-C", help="""A custom string that
         contains all the charcters to use. E.g. '-C ABC389'""", default=None)
     bruteforce_options.add_argument("--wordlist", "-w", help="""For non-wildcard
@@ -161,18 +179,17 @@ def parser_get(doc_string=""):
     parser.add_argument('--max-path-size', help="""For non-wildcard only: for
         bruteforcing DN names, which don't support wildcards, we create massive
         filters like (!(val=value1)(val=value2))[...] to be more efficient. This
-        defines how long requests will be.""", default=8100)
+        defines how long requests will be.""", default=DEFAULT_MAX_PATH)
     parser.add_argument("--attribute-name", "-a", help="""Required for
         non-wildcard bruteforcing.""")
 
     length_group = parser.add_mutually_exclusive_group()
     length_group.add_argument("--max-word-size", help="""For wildcard only: the max
-        max length we are going to attempt to bruteforce.""", type=int, default=6)
+        max length we are going to attempt to bruteforce.""", type=int, default=DEFAULT_WORD_SIZE)
     length_group.add_argument("--exact-word-size", help="""For wildcard only: The
         exact length of the string we are going to bruteforce.""", default=None, type=int)
 
     return parser
-
 
 def charset_get_premade(charset_name):
     if charset_name == "lower_and_digit":
