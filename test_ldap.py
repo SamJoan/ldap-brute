@@ -4,6 +4,7 @@ import unittest, requests, string, ldap_brute
 
 TRUE_STRING = "true string"
 FALSE_STRING = "false string"
+BAD_STRING = "bad string"
 BASE_URL = "http://example.com/?vulnparam=%s%%00"
 DEFAULT_ATTRIBUTE = "cn"
 
@@ -79,6 +80,14 @@ def wildcard_weird_chars(url, valid):
             "=w!.*"]
 
     return request_proc(url, valid)
+
+@all_requests
+def always_404(url, valid):
+    return {"status_code": 404, "content": "This is just wrong."}
+
+@all_requests
+def always_bad(url, valid):
+    return BAD_STRING
 
 class LdapBruteTest(unittest.TestCase):
 
@@ -163,6 +172,24 @@ class LdapBruteTest(unittest.TestCase):
                     ldap_brute.common.LDAP_GLOBALS.BRUTE)
 
         self.assertEqual(['uid'], res, "Valid results should only be uid.")
+
+    @patch("sys.exit")
+    @patch("ldap_brute.common.logging.warn")
+    def test_status_code(self, warn, exit):
+        with HTTMock(always_404):
+            ldap_brute.brute(BASE_URL, TRUE_STRING)
+
+        self.assertEquals(ldap_brute.common.LDAP_GLOBALS.total_requests, warn.call_count - 1)
+
+    @patch("sys.exit")
+    @patch("ldap_brute.common.logging.warn")
+    def test_bad_response(self, warn, exit):
+
+        ldap_brute.common.LDAP_GLOBALS.bad_string = BAD_STRING
+        with HTTMock(always_bad):
+            ldap_brute.brute(BASE_URL, TRUE_STRING)
+
+        self.assertEquals(ldap_brute.common.LDAP_GLOBALS.total_requests, warn.call_count - 1)
 
 if __name__ == '__main__':
     unittest.main()

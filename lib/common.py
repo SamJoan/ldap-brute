@@ -23,6 +23,7 @@ class LdapGlobals():
     total_progress_calls = 0
     total_requests = 0
     bruteforce_options = BruteforceOptions()
+    bad_string = None
 
 LDAP_GLOBALS = LdapGlobals()
 DEFAULT_CHARSET = "lower_and_digit"
@@ -54,6 +55,19 @@ def request_true(url, true_string):
     LDAP_GLOBALS.total_requests += 1
     logging.debug(url)
     response = requests.get(url)
+
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError:
+        try:
+            logging.warn("HTTP Status code %s for request %s" % (response.status_code, url))
+        except SystemExit:
+            pass
+
+    if LDAP_GLOBALS.bad_string != None and LDAP_GLOBALS.bad_string in response.text:
+        logging.warn("Specified bad string, '%s', found in response to url %s"
+                % (LDAP_GLOBALS.bad_string, url))
+
     return true_string in response.text
 
 def brute_char(base_url, charset, true_string, prefix):
@@ -156,6 +170,10 @@ def parser_get(doc_string=""):
     parser.add_argument('TRUE_STRING', help="""A string that appears in the
         response if LDAP says True. If string doesnt appear, false is assumed.""")
     parser.add_argument("--verbosity", "-v", type=int, help="0 warn, 1 info, 2 debug", default=1)
+    parser.add_argument("--bad-string", "-b", help="""Sometimes applications
+        don't respond with 404 or 500 when communication with ldap fails, but
+        rather return a string. If this string is present, a warning will be
+        displayed""", default=None)
 
     bruteforce_options = parser.add_mutually_exclusive_group()
     bruteforce_options.add_argument("--charset", "-c", help="""The set of
