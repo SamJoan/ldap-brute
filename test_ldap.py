@@ -22,9 +22,12 @@ def request_proc(url, valid):
     return FALSE_STRING
 
 def parse_and_main(cli_args):
-    parser = ldap_brute.parser_get()
+    parser = ldap_brute.common.parser_get()
     args = parser.parse_args(cli_args)
     ldap_brute.main(args, output=False)
+
+def charset_custom_set(custom_charset):
+    ldap_brute.common.charset_set(ldap_brute.common.CHARSET_DEFAULT, custom_charset, None)
 
 @all_requests
 def wildcard_admin(url, request):
@@ -76,9 +79,9 @@ def wildcard_weird_chars(url, valid):
 class LdapBruteTest(unittest.TestCase):
 
     def setUp(self):
-        ldap_brute.logging_set(2)
-        ldap_brute.LDAP_GLOBALS = ldap_brute.LdapGlobals()
-        ldap_brute.charset_set(ldap_brute.CHARSET_DEFAULT, None, None)
+        #ldap_brute.common.logging_set(2)
+        ldap_brute.common.LDAP_GLOBALS = ldap_brute.common.LdapGlobals()
+        ldap_brute.common.charset_set(ldap_brute.common.CHARSET_DEFAULT, None, None)
 
     def test_wildcard_basic(self):
         with HTTMock(wildcard_admin):
@@ -93,7 +96,7 @@ class LdapBruteTest(unittest.TestCase):
         self.assertEquals(['admin2', 'hacker'], res, "Result should contain the two entries hacker and admin2.")
 
     def test_wildcard_weird(self):
-        ldap_brute.charset_set(ldap_brute.CHARSET_DEFAULT, "x!w.", None)
+        charset_custom_set("x!w.")
         with HTTMock(wildcard_weird_chars):
             res = ldap_brute.brute(BASE_URL, TRUE_STRING)
 
@@ -109,7 +112,7 @@ class LdapBruteTest(unittest.TestCase):
     def test_attribute_simple(self):
         with HTTMock(attribute_uid):
             res = ldap_brute.brute_nowild(BASE_URL, TRUE_STRING,
-                    ldap_brute.LDAP_GLOBALS.BRUTE, 3, size_is_exact=True)
+                    ldap_brute.common.LDAP_GLOBALS.BRUTE, 3, size_is_exact=True)
 
         self.assertEquals(["uid"], res)
 
