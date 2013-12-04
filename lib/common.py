@@ -131,8 +131,8 @@ def logging_set(verbosity):
     requests_log = logging.getLogger("requests")
     requests_log.setLevel(logging.WARNING)
 
-def parser_get():
-    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,description="Bruteforces LDAP!", epilog=__doc__)
+def parser_get(doc_string=""):
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,description="Bruteforces LDAP!", epilog=doc_string)
     parser.add_argument('URL', help="""The URL that is vulnerable to LDAP
         injection, with a %%s where the injection is.""")
     parser.add_argument('TRUE_STRING', help="""A string that appears in the
