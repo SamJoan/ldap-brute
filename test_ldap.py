@@ -5,7 +5,6 @@ import unittest, requests, string, ldap_brute
 TRUE_STRING = "true string"
 FALSE_STRING = "false string"
 BASE_URL = "http://example.com/?vulnparam=%s%%00"
-DEFAULT_CHARSET = string.ascii_lowercase + string.digits
 DEFAULT_ATTRIBUTE = "cn"
 
 def url_valid(url, valid):
@@ -66,28 +65,51 @@ def attribute_uid(url, valid):
 
     return request_proc(url, valid)
 
+@all_requests
+def wildcard_weird_chars(url, valid):
+    valid = ["=w*",
+            "=w!*",
+            "=w!.*"]
+
+    return request_proc(url, valid)
+
 class LdapBruteTest(unittest.TestCase):
+
+    def setUp(self):
+        ldap_brute.logging_set(2)
+        ldap_brute.LDAP_GLOBALS = ldap_brute.LdapGlobals()
+        ldap_brute.charset_set(ldap_brute.CHARSET_DEFAULT, None, None)
+
     def test_wildcard_basic(self):
         with HTTMock(wildcard_admin):
-            res = ldap_brute.brute(BASE_URL, TRUE_STRING, DEFAULT_CHARSET)
+            res = ldap_brute.brute(BASE_URL, TRUE_STRING)
 
         self.assertEquals(['admin'], res, "Result should contain admin")
 
     def test_wildcard_multiple(self):
         with HTTMock(wildcard_adm_hckr):
-            res = ldap_brute.brute(BASE_URL, TRUE_STRING, DEFAULT_CHARSET)
+            res = ldap_brute.brute(BASE_URL, TRUE_STRING)
 
         self.assertEquals(['admin2', 'hacker'], res, "Result should contain the two entries hacker and admin2.")
 
+    def test_wildcard_weird(self):
+        ldap_brute.charset_set(ldap_brute.CHARSET_DEFAULT, "x!w.", None)
+        with HTTMock(wildcard_weird_chars):
+            res = ldap_brute.brute(BASE_URL, TRUE_STRING)
+
+        self.assertEquals(["w!."], res, "Should contain the weird result.")
+
     def test_nowildcard_simple(self):
         with HTTMock(nowildcard_admin):
-            res = ldap_brute.brute_nowild(BASE_URL, TRUE_STRING, string.ascii_lowercase, DEFAULT_ATTRIBUTE, 4, size_is_exact=True)
+            res = ldap_brute.brute_nowild(BASE_URL, TRUE_STRING,
+                    DEFAULT_ATTRIBUTE, 4, size_is_exact=True)
 
         self.assertEquals(['user'], res, "Result should contain user.")
 
     def test_attribute_simple(self):
         with HTTMock(attribute_uid):
-            res = ldap_brute.brute_nowild(BASE_URL, TRUE_STRING, string.ascii_lowercase, ldap_brute.LDAP_GLOBALS.BRUTE, 3, size_is_exact=True)
+            res = ldap_brute.brute_nowild(BASE_URL, TRUE_STRING,
+                    ldap_brute.LDAP_GLOBALS.BRUTE, 3, size_is_exact=True)
 
         self.assertEquals(["uid"], res)
 
@@ -114,7 +136,7 @@ class LdapBruteTest(unittest.TestCase):
         self.assertTrue(ldap_brute.brute_nowild.called, "Should have called ldap_brute.brute_nowild")
 
     @patch("ldap_brute.brute_nowild")
-    def test_main_att(self, mocked_method):
+    def test_main_attr(self, mocked_method):
         mocked_method.return_value = []
         cli_args = ["-A", "-c", "lower", "--max-word-size=4", "http://vulnerable/ldap/example2.php?name=admin)%s)%%00&password=", "AUTHENTICATED as"]
 

